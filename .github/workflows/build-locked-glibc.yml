@@ -38,6 +38,8 @@ jobs:
         run: |
           bash "$GITHUB_WORKSPACE/compat/integration/termux-glibc/apply-overlay.sh" \
             "$GITHUB_WORKSPACE/src"
+          sed -i 's/make -j "$TERMUX_PKG_MAKE_PROCESSES" -O install/make -O install/' "$GITHUB_WORKSPACE/src/gpkg/glibc/build.sh"
+          sed -i 's/make -j "$TERMUX_PKG_MAKE_PROCESSES" -O DESTDIR=${glibc32_dir} install/make -O DESTDIR=${glibc32_dir} install/' "$GITHUB_WORKSPACE/src/gpkg/glibc/build.sh"
 
       - name: Checkout pinned termux-packages
         run: |
