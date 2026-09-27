@@ -55,9 +55,8 @@ jobs:
         working-directory: src
         run: |
           TERMUX_BUILDER_IMAGE_NAME="ghcr.io/termux/package-builder-cgct" \
-            ./scripts/run-docker.sh \
-            ./build-package.sh -I -a aarch64 --library glibc glibc
-
+            ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 --library glibc glibc > build.log 2>&1 || { tail -n 200 build.log; exit 1; }
+            
       - name: Show produced artifact
         working-directory: src
         run: |
