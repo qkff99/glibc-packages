@@ -1,0 +1,71 @@
+name: Build locked glibc
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout pinned glibc-packages
+        run: |
+          git clone https://github.com/termux/glibc-packages.git src
+          git -C src checkout 954c6b200aa001088fcc420550b9304dd81229b8
+
+      - name: Checkout pinned tgcompat
+        run: |
+          git clone https://github.com/huntergdavis/termux-glibc-compat.git compat
+          git -C compat checkout 8d63206ac60eb1106cb5303f1ac75f5a3bd60a62
+
+      - name: Install overlay helper
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+      - name: Apply tgcompat overlay
+        run: |
+          bash "$GITHUB_WORKSPACE/compat/integration/termux-glibc/apply-overlay.sh" \
+            "$GITHUB_WORKSPACE/src"
+
+      - name: Checkout pinned termux-packages
+        run: |
+          git clone https://github.com/termux/termux-packages.git termux-packages
+          git -C termux-packages checkout 17acce9ca7978bb80923b5d481cce80822e0b85a
+
+      - name: Install pinned build system
+        run: |
+          for i in build-package.sh clean.sh packages x11-packages root-packages scripts ndk-patches; do
+            rm -rf "$GITHUB_WORKSPACE/src/$i"
+            cp -a "$GITHUB_WORKSPACE/termux-packages/$i" "$GITHUB_WORKSPACE/src/"
+          done
+
+      - name: Build ARM64 glibc
+        working-directory: src
+        run: |
+          TERMUX_BUILDER_IMAGE_NAME="ghcr.io/termux/package-builder-cgct" \
+            ./scripts/run-docker.sh \
+            ./build-package.sh -I -a aarch64 --library glibc glibc
+
+      - name: Show produced artifact
+        working-directory: src
+        run: |
+          stat -c '%n %s bytes' output/glibc_2.44_aarch64.deb
+          sha256sum output/glibc_2.44_aarch64.deb
+
+      - name: Upload glibc deb
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: locked-glibc-aarch64
+          path: src/output/glibc_2.44_aarch64.deb
+          if-no-files-found: warn
+
+      - name: Verify locked artifact
+        working-directory: src
+        run: |
+          test "$(stat -c '%s' output/glibc_2.44_aarch64.deb)" = "9828432"
+          echo "52f5ce13b66fc3307f48285d32b72951472493e91b96fc3e08c0c42772d999f3  output/glibc_2.44_aarch64.deb" | sha256sum -c -
